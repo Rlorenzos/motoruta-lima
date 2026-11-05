@@ -1,479 +1,357 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MotoRuta GPS Lima</title>
-    
-    <!-- Tailwind CSS para estilos rápidos y modernos -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome para íconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Leaflet CSS y JS (El Mapa) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- Leaflet Routing Machine (Para trazar rutas) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
-    
-    <!-- Leaflet Control Geocoder (Para buscar direcciones) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-
-    <style>
-        body { margin: 0; padding: 0; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        #map { width: 100vw; height: 100vh; z-index: 1; }
-        
-        /* Ocultar elementos de Leaflet que estorban en móvil */
-        .leaflet-control-attribution { display: none; }
-        .leaflet-routing-container { display: none !important; /* Ocultamos el panel por defecto feo */ }
-        
-        /* Estilos de la UI sobre el mapa */
-        .ui-overlay { z-index: 1000; }
-        
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Ocultar scrollbar horizontal en Accesos Rápidos */
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MotoRuta GPS Lima</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Leaflet CSS y JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet Routing Machine -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+<style>
+body { margin: 0; padding: 0; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+#map { width: 100vw; height: 100vh; z-index: 1; }
+.leaflet-control-attribution { display: none; }
+.leaflet-routing-container { display: none !important; }
+.ui-overlay { z-index: 1000; }
+.glass-panel {
+background: rgba(255, 255, 255, 0.95);
+backdrop-filter: blur(10px);
+border: 1px solid rgba(255,255,255,0.2);
+box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
 </head>
 <body class="relative">
-
-    <!-- El Contenedor del Mapa -->
-    <div id="map"></div>
-
-    <!-- Mensaje de Notificación Toast (Flotante) -->
-    <div id="toast-msg" class="fixed top-16 left-1/2 -translate-x-1/2 z-[3000] hidden bg-gray-900/95 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs flex items-center gap-3 max-w-xs w-full backdrop-blur border border-gray-700 transition-all">
-        <i id="toast-icon" class="fa-solid fa-circle-exclamation text-amber-400 text-lg flex-shrink-0"></i>
-        <div id="toast-text" class="flex-1 leading-snug">Mensaje de notificación</div>
-        <button onclick="hideToast()" class="text-gray-400 hover:text-white p-1">
-            <i class="fa-solid fa-xmark text-sm"></i>
-        </button>
-    </div>
-
-    <!-- Banner Aviso de Google Sites / Iframe -->
-    <div id="iframe-warning-banner" class="fixed top-2 left-1/2 -translate-x-1/2 z-[2500] hidden bg-amber-500 text-amber-950 font-medium px-4 py-2 rounded-xl shadow-xl text-[11px] flex items-center justify-between gap-3 max-w-sm w-[92%] border border-amber-300">
-        <div class="flex items-center gap-2">
-            <i class="fa-solid fa-triangle-exclamation text-sm"></i>
-            <span>Estás en un marco web. Toca el mapa para marcar tu inicio y destino manualmente.</span>
-        </div>
-        <button onclick="document.getElementById('iframe-warning-banner').classList.add('hidden')" class="text-amber-900 hover:text-black p-1">
-            <i class="fa-solid fa-xmark text-sm"></i>
-        </button>
-    </div>
-
-    <!-- HUD Superior: Cabecera y Buscador -->
-    <div class="absolute top-4 left-4 right-4 ui-overlay flex flex-col gap-2 pointer-events-none">
-        <div class="flex justify-between items-start">
-            <!-- Logo -->
-            <div class="glass-panel px-3 py-2 rounded-2xl flex items-center gap-3 pointer-events-auto">
-                <div class="bg-amber-400 text-amber-900 p-2 rounded-xl">
-                    <i class="fa-solid fa-motorcycle text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-gray-800 text-sm leading-tight">MotoRuta GPS</h1>
-                    <p class="text-[10px] text-gray-500 font-medium">Lima · Evita Multas</p>
-                </div>
-            </div>
-            
-            <!-- Botón Información -->
-            <button onclick="toggleInfo()" class="glass-panel w-10 h-10 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-50 active:scale-95 transition-transform pointer-events-auto">
-                <i class="fa-solid fa-info"></i>
-            </button>
-        </div>
-
-        <!-- Buscador de Direcciones -->
-        <div class="glass-panel rounded-2xl p-3 pointer-events-auto mt-1 flex flex-col gap-2 relative">
-            <div class="relative">
-                <i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-green-500"></i>
-                <input type="text" id="origen-input" placeholder="Buscar origen... o toca el mapa" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" autocomplete="off">
-            </div>
-            <div class="relative">
-                <i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-red-500"></i>
-                <input type="text" id="destino-input" placeholder="Buscar destino... o toca el mapa" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" autocomplete="off">
-            </div>
-
-            <!-- Sugerencias de Autocompletado (Estilo Google Maps) -->
-            <ul id="autocomplete-list" class="absolute top-[88px] left-3 right-3 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-[2000] hidden divide-y divide-gray-100">
-                <!-- Se llena con JS -->
-            </ul>
-
-            <!-- Accesos Rápidos Instantáneos -->
-            <div class="flex gap-2 overflow-x-auto pb-1 mt-1 scrollbar-hide w-full">
-                <button onclick="setDestinoRapidoCoordenadas(-12.0664, -77.0125, 'Gamarra, La Victoria')" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-gray-200 transition-colors flex items-center">
-                    <i class="fa-solid fa-shop mr-1"></i> Gamarra
-                </button>
-                <button onclick="setDestinoRapidoCoordenadas(-11.9835, -76.9962, 'San Juan de Lurigancho')" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-gray-200 transition-colors flex items-center">
-                    <i class="fa-solid fa-city mr-1"></i> SJL
-                </button>
-                <button onclick="setDestinoRapidoCoordenadas(-11.9926, -77.0601, 'Plaza Norte, Independencia')" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-gray-200 transition-colors flex items-center">
-                    <i class="fa-solid fa-bag-shopping mr-1"></i> Plaza Norte
-                </button>
-                <button onclick="setDestinoRapidoCoordenadas(-12.0453, -77.0281, 'Mercado Central, Lima')" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-gray-200 transition-colors flex items-center">
-                    <i class="fa-solid fa-store mr-1"></i> Centro
-                </button>
-            </div>
-
-            <button onclick="buscarRutaTexto()" class="w-full bg-gray-900 text-white font-medium py-2 rounded-xl text-sm hover:bg-gray-800 active:scale-[0.98] transition-all mt-1">
-                Trazar Ruta
-            </button>
-        </div>
-    </div>
-
-    <!-- Leyenda Flotante de Zonas Prohibidas -->
-    <div class="absolute top-44 left-4 ui-overlay bg-white/90 backdrop-blur border border-gray-200 px-3 py-2 rounded-xl shadow-md pointer-events-auto text-[11px] flex flex-col gap-1">
-        <div class="font-bold text-gray-700 mb-0.5">Leyenda Zonas:</div>
-        <div class="flex items-center gap-2">
-            <span class="w-3 h-3 bg-red-500 rounded-sm inline-block opacity-80"></span>
-            <span class="text-gray-600">Zona Prohibida (Multa)</span>
-        </div>
-        <div class="flex items-center gap-2">
-            <span class="w-3 h-3 bg-amber-500 rounded-sm inline-block opacity-80"></span>
-            <span class="text-gray-600">Vía Restringida / Expresa</span>
-        </div>
-    </div>
-
-    <!-- Panel de Información de Ruta -->
-    <!-- Controles Inferiores (Mi Ubicación, Zonas, Limpiar) -->
-    <div class="absolute bottom-6 left-4 right-4 ui-overlay flex justify-between gap-3 pointer-events-none">
-        <button id="btn-gps" onclick="iniciarGPS()" class="flex-1 glass-panel py-3 rounded-2xl flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform pointer-events-auto">
-            <i class="fa-solid fa-crosshairs text-blue-600 text-lg"></i>
-            <span class="text-[10px] font-semibold text-gray-700">Ubicarme</span>
-        </button>
-        
-        <button onclick="toggleZonas()" id="btn-zonas" class="flex-1 glass-panel py-3 rounded-2xl flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform pointer-events-auto bg-red-50 border-red-200">
-            <i class="fa-solid fa-ban text-red-600 text-lg"></i>
-            <span class="text-[10px] font-semibold text-red-700">Zonas Prohibidas</span>
-        </button>
-
-        <button onclick="limpiarMapa()" class="flex-1 glass-panel py-3 rounded-2xl flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform pointer-events-auto">
-            <i class="fa-solid fa-trash-can text-gray-600 text-lg"></i>
-            <span class="text-[10px] font-semibold text-gray-700">Limpiar</span>
-        </button>
-    </div>
-
-    <!-- Modal de Información Normativa -->
-    <div id="info-modal" class="fixed inset-0 bg-black/60 z-[4000] hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl">
-            <div class="bg-amber-400 p-4 text-center">
-                <i class="fa-solid fa-book-open text-3xl text-amber-900 mb-2"></i>
-                <h2 class="font-bold text-amber-900 text-lg">Normas para Mototaxis</h2>
-            </div>
-            <div class="p-5 text-sm text-gray-600 space-y-3">
-                <p>Las zonas rojas en el mapa representan áreas con restricción total o parcial para la circulación de vehículos menores (Mototaxis).</p>
-                <ul class="list-disc pl-5 space-y-1">
-                    <li><strong class="text-gray-800">Vías Expresas:</strong> Prohibido (Javier Prado, Paseo de la República).</li>
-                    <li><strong class="text-gray-800">Distritos Restringidos:</strong> San Isidro, Miraflores, Lince (zonas céntricas).</li>
-                    <li><strong class="text-gray-800">Vías Metropolitanas:</strong> Restricción sujeta a ordenanza distrital.</li>
-                </ul>
-                <p class="text-xs text-red-500 mt-2">* Evita las zonas rojas para no recibir multas de tránsito.</p>
-            </div>
-            <div class="p-4 border-t border-gray-100">
-                <button onclick="toggleInfo()" class="w-full bg-gray-900 text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition-colors">
-                    Entendido
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- SCRIPT PRINCIPAL DE LA APLICACIÓN -->
-    <script>
-        // --- 1. CONFIGURACIÓN DEL MAPA ---
-        const map = L.map('map', {
-            zoomControl: false,
-            tap: true
-        }).setView([-12.046374, -77.042793], 13);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
-        }).addTo(map);
-
-        // --- 2. VARIABLES GLOBALES Y POLÍGONOS DE ZONAS ---
-        let controlRuta = null;
-        let zonasLayer = null;
-        let zonasVisibles = true;
-        let isEmbedded = false;
-        
-        let markerOrigen = null;
-        let markerDestino = null;
-        let clickRoutingState = 0; 
-        let watchId = null;
-        let lastAlertTime = 0;
-
-        // Zonas Prohibidas (Rojas: Multa total) y Restringidas (Naranjas: Vías rápidas)
-        const zonasProhibidas = [
-            { name: "San Isidro Financiero", type: "prohibida", coords: [[-12.096, -77.025], [-12.096, -77.015], [-12.105, -77.015], [-12.105, -77.025]] },
-            { name: "Miraflores Centro", type: "prohibida", coords: [[-12.115, -77.035], [-12.115, -77.025], [-12.125, -77.025], [-12.125, -77.035]] },
-            { name: "Vía Expresa Paseo de la República", type: "restringida", coords: [[-12.062, -77.036], [-12.080, -77.030], [-12.100, -77.023], [-12.125, -77.018]] },
-            { name: "Av. Javier Prado", type: "restringida", coords: [[-12.089, -77.049], [-12.089, -77.030], [-12.087, -76.995], [-12.085, -76.970]] }
-        ];
-
-        function inicializarZonas() {
-            zonasLayer = L.layerGroup().addTo(map);
-            zonasProhibidas.forEach( zona => {
-                const isLine = zona.coords.length <= 4 && zona.coords[0][0] !== zona.coords[zona.coords.length-1][0];
-                const color = zona.type === 'prohibida' ? '#ef4444' : '#f59e0b';
-                
-                if(isLine || zona.name.includes("Vía") || zona.name.includes("Av.")) {
-                    L.polyline(zona.coords, { color: color, weight: 5, opacity: 0.7, dashArray: '6, 6' }).addTo(zonasLayer)
-                     .bindPopup(`<b>${zona.name}</b><br>🚫 Prohibido circular en mototaxi`);
-                } else {
-                    L.polygon(zona.coords, { color: color, fillColor: color, fillOpacity: 0.25, weight: 2 }).addTo(zonasLayer)
-                     .bindPopup(`<b>${zona.name}</b><br>⚠️ Zona restringida para vehículos menores`);
-                }
-            });
-        }
-        inicializarZonas();
-
-        // --- 3. NOTIFICACIONES TOAST ---
-        function showToast(message, type = 'warning') {
-            const toast = document.getElementById('toast-msg');
-            const icon = document.getElementById('toast-icon');
-            document.getElementById('toast-text').innerText = message;
-            
-            if(type === 'success') icon.className = 'fa-solid fa-circle-check text-green-400 text-lg flex-shrink-0';
-            else if (type === 'error') icon.className = 'fa-solid fa-circle-xmark text-red-400 text-lg flex-shrink-0';
-            else icon.className = 'fa-solid fa-triangle-exclamation text-amber-400 text-lg flex-shrink-0';
-            
-            toast.classList.remove('hidden');
-            setTimeout(() => { toast.classList.add('hidden'); }, 4000);
-        }
-        function hideToast() { document.getElementById('toast-msg').classList.add('hidden'); }
-
-        // --- 4. RADAR DE PROXIMIDAD (ALERTA ZONAS PROHIBIDAS) ---
-        function verificarProximidadZonas(latlng) {
-            const ahora = Date.now();
-            if (ahora - lastAlertTime < 20000) return; // Evitar spam de alertas cada segundo
-
-            zonasProhibidas.forEach(zona => {
-                // Tomar el primer punto del polígono/línea como referencia de centro aproximado
-                const centro = L.latLng(zona.coords[0][0], zona.coords[0][1]);
-                const distanciaMetros = latlng.distanceTo(centro);
-
-                if (distanciaMetros < 400) { // Si estás a menos de 400 metros
-                    showToast(`⚠️ ¡ALERTA! Te estás acercando a ${zona.name} (${Math.round(distanciaMetros)}m). ¡Evita multas!`, 'error');
-                    lastAlertTime = ahora;
-                }
-            });
-        }
-
-        // --- 5. GPS Y RASTREO EN VIVO ---
-        function iniciarGPS() {
-            if ("geolocation" in navigator) {
-                showToast("Obteniendo posición GPS...", "warning");
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        const latlng = L.latLng(position.coords.latitude, position.coords.longitude);
-                        map.flyTo(latlng, 16);
-                        setOrigen(latlng);
-                        document.getElementById('origen-input').value = "Mi Ubicación actual";
-                        showToast("¡GPS conectado! Sigue tu ruta.", "success");
-                        clickRoutingState = 1;
-
-                        // Activar radar continuo
-                        if(watchId) navigator.geolocation.clearWatch(watchId);
-                        watchId = navigator.geolocation.watchPosition(pos => {
-                            const currentPos = L.latLng(pos.coords.latitude, pos.coords.longitude);
-                            verificarProximidadZonas(currentPos);
-                        }, null, { enableHighAccuracy: true });
-                    },
-                    function(error) {
-                        showToast("No se pudo acceder al GPS. Toca el mapa para marcar tu inicio.", "error");
-                        clickRoutingState = 0;
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
-            } else {
-                showToast("Geolocalización no soportada en este navegador.", "error");
-            }
-        }
-
-        // --- 6. AUTOCOMPLETADO INSTANTÁNEO CON PHOTON (ESTILO GOOGLE MAPS) ---
-        let debounceTimer;
-
-        function initAutocomplete() {
-            const inputOrigen = document.getElementById('origen-input');
-            const inputDestino = document.getElementById('destino-input');
-            const suggestionList = document.getElementById('autocomplete-list');
-
-            const handleSearchInput = (e, type) => {
-                clearTimeout(debounceTimer);
-                const query = e.target.value.trim();
-                
-                if (query.length < 2) {
-                    suggestionList.classList.add('hidden');
-                    return;
-                }
-
-                debounceTimer = setTimeout(() => {
-                    // Usar la API de Photon (Komoot) enfocada en Lima, Perú
-                    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query + ", Lima")}&limit=5&lat=-12.0464&lon=-77.0428`;
-                    
-                    fetch(url)
-                        .then(res => res.json())
-                        .then(data => {
-                            suggestionList.innerHTML = '';
-                            if (data.features && data.features.length > 0) {
-                                data.features.forEach(feature => {
-                                    const props = feature.properties;
-                                    const coords = feature.geometry.coordinates; // [lon, lat]
-                                    const name = props.name || 'Lugar sin nombre';
-                                    const street = props.street ? props.street + ', ' : '';
-                                    const district = props.city || props.county || props.state || 'Lima';
-                                    
-                                    const li = document.createElement('li');
-                                    li.className = "px-4 py-2.5 text-xs text-gray-700 hover:bg-amber-50 cursor-pointer flex items-center gap-3 transition-colors";
-                                    li.innerHTML = `<i class="fa-solid fa-map-pin text-amber-500 text-sm"></i>
-                                                    <div>
-                                                        <span class="font-bold text-gray-900">${name}</span><br>
-                                                        <span class="text-[10px] text-gray-500">${street}${district}</span>
-                                                    </div>`;
-                                    
-                                    li.onclick = () => {
-                                        const latlng = L.latLng(coords[1], coords[0]);
-                                        suggestionList.classList.add('hidden');
-                                        
-                                        if (type === 'origen') {
-                                            inputOrigen.value = name;
-                                            setOrigen(latlng);
-                                            map.flyTo(latlng, 15);
-                                            clickRoutingState = 1;
-                                        } else {
-                                            inputDestino.value = name;
-                                            setDestino(latlng);
-                                            if (markerOrigen) calcularRuta();
-                                        }
-                                    };
-                                    suggestionList.appendChild(li);
-                                });
-                                suggestionList.classList.remove('hidden');
-                            } else {
-                                suggestionList.classList.add('hidden');
-                            }
-                        }).catch(() => suggestionList.classList.add('hidden'));
-                }, 300);
-            };
-
-            inputOrigen.addEventListener('input', (e) => handleSearchInput(e, 'origen'));
-            inputDestino.addEventListener('input', (e) => handleSearchInput(e, 'destino'));
-
-            document.addEventListener('click', (e) => {
-                if (!inputOrigen.contains(e.target) && !inputDestino.contains(e.target) && !suggestionList.contains(e.target)) {
-                    suggestionList.classList.add('hidden');
-                }
-            });
-        }
-        setTimeout(initAutocomplete, 400);
-
-        // --- 7. ACCESOS RÁPIDOS INSTANTÁNEOS ---
-        function setDestinoRapidoCoordenadas(lat, lng, nombre) {
-            const latlng = L.latLng(lat, lng);
-            document.getElementById('destino-input').value = nombre.split(',')[0];
-            setDestino(latlng);
-            
-            if (markerOrigen) {
-                calcularRuta();
-            } else {
-                map.flyTo(latlng, 14);
-                showToast(`Destino ${nombre.split(',')[0]} fijado. Toca o busca tu Origen.`, "success");
-                clickRoutingState = 0;
-            }
-        }
-
-        // --- 8. MAPA Y RUTAS ---
-        const iconA = L.divIcon({ className: 'custom-icon', html: '<div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg"><i class="fa-solid fa-a text-xs"></i></div>', iconSize: [32, 32], iconAnchor: [16, 16] });
-        const iconB = L.divIcon({ className: 'custom-icon', html: '<div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg"><i class="fa-solid fa-b text-xs"></i></div>', iconSize: [32, 32], iconAnchor: [16, 16] });
-
-        map.on('click', function(e) {
-            if (clickRoutingState === 0) {
-                setOrigen(e.latlng);
-                showToast("Origen marcado en mapa. Ahora marca tu Destino.", "success");
-                clickRoutingState = 1;
-            } else {
-                setDestino(e.latlng);
-                calcularRuta();
-                clickRoutingState = 0;
-            }
-        });
-
-        function setOrigen(latlng) {
-            if(markerOrigen) map.removeLayer(markerOrigen);
-            markerOrigen = L.marker(latlng, {icon: iconA}).addTo(map);
-        }
-
-        function setDestino(latlng) {
-            if(markerDestino) map.removeLayer(markerDestino);
-            markerDestino = L.marker(latlng, {icon: iconB}).addTo(map);
-        }
-
-        function calcularRuta() {
-            if (!markerOrigen || !markerDestino) return;
-            if (controlRuta) map.removeControl(controlRuta);
-            
-            showToast("Calculando ruta para mototaxi...", "success");
-
-            controlRuta = L.Routing.control({
-                waypoints: [markerOrigen.getLatLng(), markerDestino.getLatLng()],
-                router: L.Routing.osrmv1({ language: 'es', profile: 'driving' }),
-                createMarker: function() { return null; },
-                lineOptions: { styles: [{ color: '#3b82f6', opacity: 0.8, weight: 6 }] },
-                show: false, addWaypoints: false, fitSelectedRoutes: true
-            }).addTo(map);
-
-            controlRuta.on('routesfound', function(e) {
-                const resumen = e.routes[0].summary;
-                const panel = document.getElementById('route-info-panel');
-                panel.classList.remove('hidden', 'translate-y-4', 'opacity-0');
-                document.getElementById('route-time').innerText = Math.round(resumen.totalTime / 60) + ' min';
-                document.getElementById('route-distance').innerText = (resumen.totalDistance / 1000).toFixed(1) + ' km';
-            });
-        }
-
-        function limpiarMapa() {
-            if (controlRuta) { map.removeControl(controlRuta); controlRuta = null; }
-            if(markerOrigen) { map.removeLayer(markerOrigen); markerOrigen = null; }
-            if(markerDestino) { map.removeLayer(markerDestino); markerDestino = null; }
-            document.getElementById('origen-input').value = "";
-            document.getElementById('destino-input').value = "";
-            clickRoutingState = 0;
-            const panel = document.getElementById('route-info-panel');
-            panel.classList.add('translate-y-4', 'opacity-0');
-            setTimeout(() => panel.classList.add('hidden'), 300);
-            showToast("Mapa restablecido.", "success");
-        }
-
-        function toggleZonas() {
-            const btn = document.getElementById('btn-zonas');
-            if (zonasVisibles) {
-                map.removeLayer(zonasLayer);
-                btn.classList.remove('bg-red-50', 'border-red-200');
-            } else {
-                map.addLayer(zonasLayer);
-                btn.classList.add('bg-red-50', 'border-red-200');
-            }
-            zonasVisibles = !zonasVisibles;
-        }
-
-        function toggleInfo() {
-            const modal = document.getElementById('info-modal');
-            modal.classList.toggle('hidden');
-            modal.classList.toggle('flex');
-        }
-
-        function buscarRutaTexto() {
-            if (markerOrigen && markerDestino) calcularRuta();
-            else showToast("Selecciona un origen y un destino.", "error");
-        }
-    </script>
+<div id="map"></div>
+<!-- Notificación Toast -->
+<div id="toast-msg" class="fixed top-16 left-1/2 -translate-x-1/2 z-[3000] hidden bg-gray-900/95 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs flex items-center gap-3 max-w-xs w-full backdrop-blur border border-gray-700 transition-all">
+<i id="toast-icon" class="fa-solid fa-circle-exclamation text-amber-400 text-lg flex-shrink-0"></i>
+<div id="toast-text" class="flex-1 leading-snug">Notificación</div>
+<button onclick="hideToast()" class="text-gray-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-sm"></i></button>
+</div>
+<!-- HUD Superior -->
+<div class="absolute top-4 left-4 right-4 ui-overlay flex flex-col gap-2 pointer-events-none">
+<div class="flex justify-between items-start">
+<div class="glass-panel px-3 py-2 rounded-2xl flex items-center gap-3 pointer-events-auto">
+<div class="bg-amber-400 text-amber-900 p-2 rounded-xl">
+<i class="fa-solid fa-motorcycle text-xl"></i>
+</div>
+<div>
+<h1 class="font-bold text-gray-800 text-sm leading-tight">MotoRuta GPS</h1>
+<p class="text-[10px] text-gray-500 font-medium">Lima · Evita Multas</p>
+</div>
+</div>
+<button onclick="toggleInfo()" class="glass-panel w-10 h-10 rounded-full flex items-center justify-center text-blue-600 hover:bg-blue-50 active:scale-95 transition-transform pointer-events-auto shadow-md">
+<i class="fa-solid fa-info text-base"></i>
+</button>
+</div>
+<!-- Buscador -->
+<div class="glass-panel rounded-2xl p-3 pointer-events-auto mt-1 flex flex-col gap-2 relative shadow-lg">
+<div class="relative">
+<i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-green-500"></i>
+<input type="text" id="origen-input" placeholder="Buscar origen... o toca el mapa" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" autocomplete="off">
+</div>
+<div class="relative">
+<i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-red-500"></i>
+<input type="text" id="destino-input" placeholder="Buscar destino exacto... (Ej. Dublin 4434)" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" autocomplete="off">
+</div>
+<!-- Sugerencias -->
+<ul id="autocomplete-list" class="absolute top-[92px] left-3 right-3 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-[2000] hidden divide-y divide-gray-100"></ul>
+<!-- Rutas Frecuentes / Accesos Rápidos Dinámicos -->
+<div class="flex items-center gap-2 overflow-x-auto pb-1 mt-1 scrollbar-hide w-full" id="frequent-routes-bar">
+<!-- Se inyecta con JS -->
+</div>
+<div class="flex gap-2 mt-1">
+<button onclick="guardarDestinoActual()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium py-2 rounded-xl transition-colors border border-gray-200">
+<i class="fa-solid fa-star text-amber-500 mr-1"></i> Guardar Frecuente
+</button>
+<button onclick="buscarRutaTexto()" class="flex-[2] bg-gray-900 text-white font-medium py-2 rounded-xl text-sm hover:bg-gray-800 active:scale-[0.98] transition-all">
+Trazar Ruta
+</button>
+</div>
+</div>
+</div>
+<!-- Controles Inferiores -->
+<div class="absolute bottom-6 left-4 right-4 ui-overlay flex justify-between gap-3 pointer-events-none">
+<button id="btn-gps" onclick="iniciarGPS()" class="flex-1 glass-panel py-3 rounded-2xl flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform pointer-events-auto">
+<i class="fa-solid fa-crosshairs text-blue-600 text-lg"></i>
+<span class="text-[10px] font-semibold text-gray-700">Ubicarme</span>
+</button>
+<button onclick="toggleZonas()" id="btn-zonas" class="flex-1 glass-panel py-3 rounded-2xl flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform pointer-events-auto bg-red-50 border-red-200">
+<i class="fa-solid fa-ban text-red-600 text-lg"></i>
+<span class="text-[10px] font-semibold text-red-700">Zonas Prohibidas</span>
+</button>
+<button onclick="limpiarMapa()" class="flex-1 glass-panel py-3 rounded-2xl flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform pointer-events-auto">
+<i class="fa-solid fa-trash-can text-gray-600 text-lg"></i>
+<span class="text-[10px] font-semibold text-gray-700">Limpiar</span>
+</button>
+</div>
+<!-- Modal de Información Normativa y Leyenda de Zonas -->
+<div id="info-modal" class="fixed inset-0 bg-black/60 z-[4000] hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+<div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+<div class="bg-amber-400 p-4 text-center shrink-0">
+<i class="fa-solid fa-shield-halved text-3xl text-amber-900 mb-1"></i>
+<h2 class="font-bold text-amber-900 text-base">Normas y Leyenda GPS</h2>
+</div>
+<div class="p-5 text-xs text-gray-600 space-y-4 overflow-y-auto">
+<!-- Leyenda -->
+<div class="bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-2">
+<div class="font-bold text-gray-800 text-sm">Leyenda de Zonas:</div>
+<div class="flex items-center gap-2">
+<span class="w-3.5 h-3.5 bg-red-500 rounded-md inline-block opacity-90 shrink-0"></span>
+<span><strong>Zona Prohibida:</strong> Multa y captura (San Isidro/Miraflores)</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3.5 h-3.5 bg-amber-500 rounded-md inline-block opacity-90 shrink-0"></span>
+<span><strong>Vía Restringida:</strong> Vías rápidas prohibidas (Javier Prado)</span>
+</div>
+</div>
+<!-- Normativa -->
+<div class="space-y-2">
+<div class="font-bold text-gray-800 text-sm">Reglamento Mototaxi Lima:</div>
+<ul class="list-disc pl-4 space-y-1">
+<li>Prohibido circular por Vías Expresas y Arteriales principales.</li>
+<li>Multas severas por invadir distritos residenciales céntricos prohibidos.</li>
+<li>Usa los botones frecuentes para guardar tus destinos de trabajo habituales.</li>
+</ul>
+</div>
+</div>
+<div class="p-4 border-t border-gray-100 shrink-0">
+<button onclick="toggleInfo()" class="w-full bg-gray-900 text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition-colors text-sm">
+Entendido
+</button>
+</div>
+</div>
+</div>
+<!-- SCRIPT -->
+<script>
+const map = L.map('map', { zoomControl: false, tap: true }).setView([-12.046374, -77.042793], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+maxZoom: 19,
+attribution: '© OpenStreetMap'
+}).addTo(map);
+let controlRuta = null;
+let zonasLayer = null;
+let zonasVisibles = true;
+let markerOrigen = null;
+let markerDestino = null;
+let ultimoDestinoCoords = null;
+let clickRoutingState = 0;
+let watchId = null;
+let lastAlertTime = 0;
+const zonasProhibidas = [
+{ name: "San Isidro Financiero", type: "prohibida", coords: [[-12.096, -77.025], [-12.096, -77.015], [-12.105, -77.015], [-12.105, -77.025]] },
+{ name: "Miraflores Centro", type: "prohibida", coords: [[-12.115, -77.035], [-12.115, -77.025], [-12.125, -77.025], [-12.125, -77.035]] },
+{ name: "Vía Expresa Paseo de la República", type: "restringida", coords: [[-12.062, -77.036], [-12.080, -77.030], [-12.100, -77.023], [-12.125, -77.018]] },
+{ name: "Av. Javier Prado", type: "restringida", coords: [[-12.089, -77.049], [-12.089, -77.030], [-12.087, -76.995], [-12.085, -76.970]] }
+];
+function inicializarZonas() {
+zonasLayer = L.layerGroup().addTo(map);
+zonasProhibidas.forEach( zona => {
+const color = zona.type === 'prohibida' ? '#ef4444' : '#f59e0b';
+L.polygon(zona.coords, { color: color, fillColor: color, fillOpacity: 0.25, weight: 2 }).addTo(zonasLayer)
+.bindPopup(<b>${zona.name}</b><br>🚫 Prohibido / Restringido);
+});
+}
+inicializarZonas();
+// --- RUTAS FRECUENTES PERSONALIZABLES ---
+let rutasFrecuentes = JSON.parse(localStorage.getItem('motoruta_frecuentes')) || [
+{ name: "Gamarra", lat: -12.0664, lng: -77.0125 },
+{ name: "SJL", lat: -11.9835, lng: -76.9962 },
+{ name: "Plaza Norte", lat: -11.9926, lng: -77.0601 },
+{ name: "Centro Lima", lat: -12.0453, lng: -77.0281 }
+];
+function renderizarRutasFrecuentes() {
+const bar = document.getElementById('frequent-routes-bar');
+bar.innerHTML = '';
+rutasFrecuentes.forEach((ruta, index) => {
+const btn = document.createElement('div');
+btn.className = "shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-gray-200 transition-colors flex items-center gap-2 cursor-pointer";
+btn.innerHTML = <span onclick="usarRutaFrecuente(${ruta.lat}, ${ruta.lng}, '${ruta.name}')"><i class="fa-solid fa-bookmark text-amber-500 mr-1"></i>${ruta.name}</span> <button onclick="eliminarRutaFrecuente(event, ${index})" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark"></i></button>;
+bar.appendChild(btn);
+});
+}
+renderizarRutasFrecuentes();
+function guardarDestinoActual() {
+if (!ultimoDestinoCoords) {
+showToast("Busca o selecciona un destino en el mapa primero.", "error");
+return;
+}
+const nombre = document.getElementById('destino-input').value.split(',')[0];
+rutasFrecuentes.push({ name: nombre, lat: ultimoDestinoCoords.lat, lng: ultimoDestinoCoords.lng });
+localStorage.setItem('motoruta_frecuentes', JSON.stringify(rutasFrecuentes));
+renderizarRutasFrecuentes();
+showToast(¡Ruta "${nombre}" guardada en frecuentes!, "success");
+}
+function eliminarRutaFrecuente(e, index) {
+e.stopPropagation();
+rutasFrecuentes.splice(index, 1);
+localStorage.setItem('motoruta_frecuentes', JSON.stringify(rutasFrecuentes));
+renderizarRutasFrecuentes();
+showToast("Ruta eliminada de frecuentes.", "success");
+}
+function usarRutaFrecuente(lat, lng, nombre) {
+const latlng = L.latLng(lat, lng);
+document.getElementById('destino-input').value = nombre;
+ultimoDestinoCoords = latlng;
+setDestino(latlng);
+if (markerOrigen) calcularRuta();
+else { map.flyTo(latlng, 14); showToast(Destino ${nombre} cargado., "success"); }
+}
+function showToast(message, type = 'warning') {
+const toast = document.getElementById('toast-msg');
+const icon = document.getElementById('toast-icon');
+document.getElementById('toast-text').innerText = message;
+icon.className = type === 'success' ? 'fa-solid fa-circle-check text-green-400 text-lg flex-shrink-0' : 'fa-solid fa-triangle-exclamation text-amber-400 text-lg flex-shrink-0';
+toast.classList.remove('hidden');
+setTimeout(() => toast.classList.add('hidden'), 4000);
+}
+function hideToast() { document.getElementById('toast-msg').classList.add('hidden'); }
+// --- AUTOCOMPLETADO EXACTO (PHOTON API) ---
+let debounceTimer;
+function initAutocomplete() {
+const inputOrigen = document.getElementById('origen-input');
+const inputDestino = document.getElementById('destino-input');
+const suggestionList = document.getElementById('autocomplete-list');
+const handleSearch = (e, type) => {
+clearTimeout(debounceTimer);
+const query = e.target.value.trim();
+if (query.length < 2) { suggestionList.classList.add('hidden'); return; }
+debounceTimer = setTimeout(() => {
+// Parámetros optimizados para buscar números de calle y direcciones exactas en Lima
+const url = https://photon.komoot.io/api/?q=${encodeURIComponent(query + ", Lima")}&limit=6&lat=-12.0464&lon=-77.0428;
+fetch(url)
+.then(res => res.json())
+.then(data => {
+suggestionList.innerHTML = '';
+if (data.features && data.features.length > 0) {
+data.features.forEach(feature => {
+const props = feature.properties;
+const coords = feature.geometry.coordinates; // [lon, lat]
+const name = props.name || '';
+const houseNumber = props.housenumber ?  #${props.housenumber} : '';
+const street = props.street ? ${props.street},  : '';
+const district = props.city || props.county || 'Lima';
+const displayName = ${name}${houseNumber} (${district});
+const li = document.createElement('li');
+li.className = "px-4 py-2.5 text-xs text-gray-700 hover:bg-amber-50 cursor-pointer flex items-center gap-3 transition-colors";
+li.innerHTML = <i class="fa-solid fa-map-pin text-amber-500 text-sm"></i> <div> <span class="font-bold text-gray-900">${name}${houseNumber}</span><br> <span class="text-[10px] text-gray-500">${street}${district}</span> </div>;
+li.onclick = () => {
+const latlng = L.latLng(coords[1], coords[0]);
+suggestionList.classList.add('hidden');
+if (type === 'origen') {
+inputOrigen.value = displayName;
+setOrigen(latlng);
+map.flyTo(latlng, 16);
+} else {
+inputDestino.value = displayName;
+ultimoDestinoCoords = latlng;
+setDestino(latlng);
+if (markerOrigen) calcularRuta();
+}
+};
+suggestionList.appendChild(li);
+});
+suggestionList.classList.remove('hidden');
+} else { suggestionList.classList.add('hidden'); }
+}).catch(() => suggestionList.classList.add('hidden'));
+}, 250);
+};
+inputOrigen.addEventListener('input', (e) => handleSearch(e, 'origen'));
+inputDestino.addEventListener('input', (e) => handleSearch(e, 'destino'));
+document.addEventListener('click', (e) => {
+if (!inputOrigen.contains(e.target) && !inputDestino.contains(e.target) && !suggestionList.contains(e.target)) {
+suggestionList.classList.add('hidden');
+}
+});
+}
+setTimeout(initAutocomplete, 300);
+// --- MAPA Y RUTAS ---
+const iconA = L.divIcon({ className: 'custom-icon', html: '<div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg"><i class="fa-solid fa-a text-xs"></i></div>', iconSize: [32, 32], iconAnchor: [16, 16] });
+const iconB = L.divIcon({ className: 'custom-icon', html: '<div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white border-2 border-white shadow-lg"><i class="fa-solid fa-b text-xs"></i></div>', iconSize: [32, 32], iconAnchor: [16, 16] });
+map.on('click', function(e) {
+if (clickRoutingState === 0) {
+setOrigen(e.latlng);
+showToast("Origen marcado. Toca el destino.", "success");
+clickRoutingState = 1;
+} else {
+ultimoDestinoCoords = e.latlng;
+setDestino(e.latlng);
+calcularRuta();
+clickRoutingState = 0;
+}
+});
+function setOrigen(latlng) {
+if(markerOrigen) map.removeLayer(markerOrigen);
+markerOrigen = L.marker(latlng, {icon: iconA}).addTo(map);
+}
+function setDestino(latlng) {
+if(markerDestino) map.removeLayer(markerDestino);
+markerDestino = L.marker(latlng, {icon: iconB}).addTo(map);
+}
+function calcularRuta() {
+if (!markerOrigen || !markerDestino) return;
+if (controlRuta) map.removeControl(controlRuta);
+showToast("Calculando ruta...", "success");
+controlRuta = L.Routing.control({
+waypoints: [markerOrigen.getLatLng(), markerDestino.getLatLng()],
+router: L.Routing.osrmv1({ language: 'es', profile: 'driving' }),
+createMarker: function() { return null; },
+lineOptions: { styles: [{ color: '#3b82f6', opacity: 0.8, weight: 6 }] },
+show: false, addWaypoints: false, fitSelectedRoutes: true
+}).addTo(map);
+}
+function iniciarGPS() {
+if ("geolocation" in navigator) {
+showToast("Activando GPS...", "warning");
+navigator.geolocation.getCurrentPosition(
+function(position) {
+const latlng = L.latLng(position.coords.latitude, position.coords.longitude);
+map.flyTo(latlng, 16);
+setOrigen(latlng);
+document.getElementById('origen-input').value = "Mi Ubicación actual";
+showToast("¡GPS conectado!", "success");
+clickRoutingState = 1;
+},
+function() { showToast("Error de GPS. Toca el mapa.", "error"); },
+{ enableHighAccuracy: true }
+);
+}
+}
+function limpiarMapa() {
+if (controlRuta) { map.removeControl(controlRuta); controlRuta = null; }
+if(markerOrigen) { map.removeLayer(markerOrigen); markerOrigen = null; }
+if(markerDestino) { map.removeLayer(markerDestino); markerDestino = null; }
+document.getElementById('origen-input').value = "";
+document.getElementById('destino-input').value = "";
+ultimoDestinoCoords = null;
+clickRoutingState = 0;
+showToast("Mapa limpio.", "success");
+}
+function toggleZonas() {
+const btn = document.getElementById('btn-zonas');
+if (zonasVisibles) { map.removeLayer(zonasLayer); btn.classList.remove('bg-red-50', 'border-red-200'); }
+else { map.addLayer(zonasLayer); btn.classList.add('bg-red-50', 'border-red-200'); }
+zonasVisibles = !zonasVisibles;
+}
+function toggleInfo() {
+const modal = document.getElementById('info-modal');
+modal.classList.toggle('hidden');
+modal.classList.toggle('flex');
+}
+function buscarRutaTexto() {
+if (markerOrigen && markerDestino) calcularRuta();
+else showToast("Selecciona origen y destino.", "error");
+}
+</script>
 </body>
 </html>
