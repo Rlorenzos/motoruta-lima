@@ -40,6 +40,10 @@
             border: 1px solid rgba(255,255,255,0.2);
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
+
+        /* Ocultar scrollbar horizontal en Accesos Rápidos */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="relative">
@@ -88,16 +92,38 @@
         </div>
 
         <!-- Buscador de Direcciones -->
-        <div class="glass-panel rounded-2xl p-3 pointer-events-auto mt-1 flex flex-col gap-2">
+        <div class="glass-panel rounded-2xl p-3 pointer-events-auto mt-1 flex flex-col gap-2 relative">
             <div class="relative">
                 <i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-green-500"></i>
-                <input type="text" id="origen-input" placeholder="Buscar origen... o toca el mapa" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <input type="text" id="origen-input" placeholder="Buscar origen... o toca el mapa" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" autocomplete="off">
             </div>
             <div class="relative">
                 <i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-red-500"></i>
-                <input type="text" id="destino-input" placeholder="Buscar destino... o toca el mapa" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <input type="text" id="destino-input" placeholder="Buscar destino... o toca el mapa" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" autocomplete="off">
             </div>
-            <button onclick="buscarRutaTexto()" class="w-full bg-gray-900 text-white font-medium py-2 rounded-xl text-sm hover:bg-gray-800 active:scale-[0.98] transition-all">
+
+            <!-- Sugerencias de Autocompletado -->
+            <ul id="autocomplete-list" class="absolute top-[88px] left-3 right-3 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-[2000] hidden">
+                <!-- Se llena con JS -->
+            </ul>
+
+            <!-- Accesos Rápidos -->
+            <div class="flex gap-2 overflow-x-auto pb-1 mt-1 scrollbar-hide w-full">
+                <button onclick="setDestinoRapido('Gamarra, La Victoria')" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-gray-200 transition-colors flex items-center">
+                    <i class="fa-solid fa-shop mr-1"></i> Gamarra
+                </button>
+                <button onclick="setDestinoRapido('San Juan de Lurigancho')" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-gray-200 transition-colors flex items-center">
+                    <i class="fa-solid fa-city mr-1"></i> SJL
+                </button>
+                <button onclick="setDestinoRapido('Plaza Norte, Independencia')" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-gray-200 transition-colors flex items-center">
+                    <i class="fa-solid fa-bag-shopping mr-1"></i> Plaza Norte
+                </button>
+                <button onclick="setDestinoRapido('Mercado Central, Lima')" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-gray-200 transition-colors flex items-center">
+                    <i class="fa-solid fa-store mr-1"></i> Centro
+                </button>
+            </div>
+
+            <button onclick="buscarRutaTexto()" class="w-full bg-gray-900 text-white font-medium py-2 rounded-xl text-sm hover:bg-gray-800 active:scale-[0.98] transition-all mt-1">
                 Trazar Ruta
             </button>
         </div>
@@ -444,6 +470,106 @@
                 }
             });
         }
+
+        // --- 7. AUTOCOMPLETADO Y ACCESOS RÁPIDOS ---
+        let debounceTimer;
+
+        function initAutocomplete() {
+            const inputOrigen = document.getElementById('origen-input');
+            const inputDestino = document.getElementById('destino-input');
+            const suggestionList = document.getElementById('autocomplete-list');
+
+            const handleInput = (e, type) => {
+                clearTimeout(debounceTimer);
+                const query = e.target.value;
+                
+                if (query.length < 3) {
+                    suggestionList.classList.add('hidden');
+                    return;
+                }
+                
+                debounceTimer = setTimeout(() => {
+                    // Forzar búsqueda en Lima para mayor precisión
+                    geocoder.geocode(query + ", Lima, Perú", function(results) {
+                        suggestionList.innerHTML = '';
+                        if (results.length > 0) {
+                            results.slice(0, 5).forEach(res => {
+                                const li = document.createElement('li');
+                                li.className = "px-4 py-2 text-sm text-gray-700 border-b border-gray-100 hover:bg-amber-50 cursor-pointer flex items-start gap-2";
+                                // Formatear nombre: Negrita para el lugar, gris para el distrito/ciudad
+                                const parts = res.name.split(',');
+                                const title = parts[0];
+                                const sub = parts.slice(1).join(',').substring(0, 40) + '...';
+                                
+                                li.innerHTML = `<i class="fa-solid fa-location-crosshairs text-gray-400 mt-1"></i> <div><span class="font-bold text-gray-800">${title}</span><br><span class="text-[10px] text-gray-500 leading-tight">${sub}</span></div>`;
+                                li.onclick = () => selectSuggestion(res, type);
+                                suggestionList.appendChild(li);
+                            });
+                            
+                            // Posicionar debajo del input activo
+                            const isOrigen = type === 'origen';
+                            suggestionList.style.top = isOrigen ? '46px' : '88px';
+                            suggestionList.classList.remove('hidden');
+                        } else {
+                            suggestionList.classList.add('hidden');
+                        }
+                    });
+                }, 500); // 500ms de retraso para no saturar la red mientras escribe
+            };
+
+            inputOrigen.addEventListener('input', (e) => handleInput(e, 'origen'));
+            inputDestino.addEventListener('input', (e) => handleInput(e, 'destino'));
+
+            // Cerrar lista si hace click en otra parte
+            document.addEventListener('click', (e) => {
+                if (!inputOrigen.contains(e.target) && !inputDestino.contains(e.target) && !suggestionList.contains(e.target)) {
+                    suggestionList.classList.add('hidden');
+                }
+            });
+        }
+
+        function selectSuggestion(result, type) {
+            document.getElementById('autocomplete-list').classList.add('hidden');
+            const shortName = result.name.split(',')[0];
+            
+            if (type === 'origen') {
+                document.getElementById('origen-input').value = shortName;
+                setOrigen(result.center);
+                map.flyTo(result.center, 15);
+                clickRoutingState = 1; // Ahora espera el destino
+            } else {
+                document.getElementById('destino-input').value = shortName;
+                setDestino(result.center);
+                if (markerOrigen) calcularRuta();
+            }
+        }
+
+        function setDestinoRapido(query) {
+            const inputDestino = document.getElementById('destino-input');
+            inputDestino.value = query.split(',')[0] + "...";
+            showToast("Buscando " + query.split(',')[0] + "...", "warning");
+            
+            geocoder.geocode(query + ", Lima, Perú", function(results) {
+                if(results.length > 0) {
+                    setDestino(results[0].center);
+                    inputDestino.value = results[0].name.split(',')[0];
+                    if (markerOrigen) {
+                        calcularRuta();
+                    } else {
+                        map.flyTo(results[0].center, 14);
+                        showToast("Destino marcado. Ahora marca tu Origen.", "success");
+                        clickRoutingState = 0;
+                    }
+                } else {
+                    showToast("No se pudo encontrar la ubicación.", "error");
+                    inputDestino.value = "";
+                }
+            });
+        }
+
+        // Inicializar listeners cuando carga la página
+        setTimeout(initAutocomplete, 500);
+
     </script>
 </body>
 </html>
